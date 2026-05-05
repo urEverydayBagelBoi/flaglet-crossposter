@@ -33,10 +33,10 @@ discord_log.setLevel(logging.DEBUG)
 
 # Discord Client
 import interactions
-from interactions import Client, Intents
-from interactions.api.events import Component
+from interactions import Intents
+# from interactions.api.events import Component
 
-discord_client = Client(
+discord_client = interactions.Client(
     intents=Intents.DEFAULT | Intents.MESSAGE_CONTENT,
     asyncio_debug=True,
     logger=discord_log
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     if not os.path.exists('config.ini'):
         create_config()
         print("Config file created. Please edit it before running bot.py again.")
-        return
-    config_values = read_config()
-    print(config_values)
-    discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
+    else:
+        config_values = read_config()
+        print(config_values)
+        discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
