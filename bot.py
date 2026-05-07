@@ -33,22 +33,22 @@ discord_log.setLevel(logging.DEBUG)
 
 # Discord Client
 import interactions
-from interactions import Intents
+from interactions import Intents as DiscordIntents
 # from interactions.api.events import Component
 
 discord_client = interactions.Client(
-    intents=Intents.DEFAULT | Intents.MESSAGE_CONTENT,
+    intents=DiscordIntents.DEFAULT | DiscordIntents.MESSAGE_CONTENT,
     asyncio_debug=True,
     logger=discord_log
 )
 
 @interactions.listen()
 async def on_ready():
-    discord_log.info(f"Ready. Logged in as {discord_client}\nOwned by {discord_client.owner}")
+    discord_log.info(f"Discord client ready. Logged in as {discord_client} - Owned by {discord_client.owner}")
 
 @interactions.listen()
 async def on_message_create(event):
-    # discord_log.debug(f"Message received: {event.message.content}")
+    # discord_log.debug(f"Discord message received: {event.message.content}")
     content = event.message.content
     if not event.message.author.id == discord_client.user.id and ("#art " in content or content.endswith("#art")):
         attachment_urls = " ".join([attachment.url for attachment in event.message.attachments])
