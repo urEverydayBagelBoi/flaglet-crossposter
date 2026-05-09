@@ -52,7 +52,7 @@ async def on_ready():
 async def on_message_create(event):
     discord_log.debug(f"Discord message received: {event.message.content}")
     content = event.message.content
-    if not event.message.author.id == discord_client.user.id and ("#art " in content or content.endswith("#art")):
+    if not event.message.author.id == discord_client.user.id and ("!art " in content or content.endswith("!art")):
         attachment_urls = " ".join([attachment.url for attachment in event.message.attachments])
         msg = f"Original Message: {event.message.jump_url}\nAuthor: {event.message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"
         discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
