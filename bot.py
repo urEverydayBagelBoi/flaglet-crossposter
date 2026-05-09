@@ -11,6 +11,7 @@ def create_config():
     config = configparser.ConfigParser()
     config['Discord'] = {
         'art_channel': 'channel_id',
+        'approval_channel': 'channel_id',
     }
     with open('config.ini', 'w') as config_file:
         config.write(config_file)
@@ -20,6 +21,7 @@ def read_config():
     config.read('config.ini')
     config_values = {
         'discord_art_channel': (config.get('Discord', 'art_channel'))
+        'discord_approval_channel': (config.get('Discord', 'approval_channel'))
     }
     return config_values
 
