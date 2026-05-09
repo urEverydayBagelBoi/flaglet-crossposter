@@ -20,8 +20,8 @@ def read_config():
     config = configparser.ConfigParser()
     config.read('config.ini')
     config_values = {
-        'discord_art_channel': (config.get('Discord', 'art_channel'))
-        'discord_approval_channel': (config.get('Discord', 'approval_channel'))
+        'discord_art_channel': int(config.get('Discord', 'art_channel')),
+        'discord_approval_channel': int(config.get('Discord', 'approval_channel')),
     }
     return config_values
 
@@ -50,12 +50,12 @@ async def on_ready():
 
 @interactions.listen()
 async def on_message_create(event):
-    # discord_log.debug(f"Discord message received: {event.message.content}")
+    discord_log.debug(f"Discord message received: {event.message.content}")
     content = event.message.content
     if not event.message.author.id == discord_client.user.id and ("#art " in content or content.endswith("#art")):
         attachment_urls = " ".join([attachment.url for attachment in event.message.attachments])
         msg = f"Original Message: {event.message.jump_url}\nAuthor: {event.message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"
-        # discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
+        discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
     
         _ = await discord_client.fetch_channel(config_values['discord_art_channel'])
         await _.send(msg)
