@@ -30,7 +30,7 @@ config_values = None
 # Logging
 import logging
 logging.basicConfig()
-discord_log = logging.getLogger("FlagletLogger")
+discord_log = logging.getLogger("DiscordLog")
 discord_log.setLevel(logging.DEBUG)
 
 # Discord Client
@@ -46,7 +46,7 @@ discord_client = interactions.Client(
 
 @interactions.listen()
 async def on_ready():
-    discord_log.info(f"Discord client ready. Logged in as {discord_client} - Owned by {discord_client.owner}")
+    discord_log.info(f"Discord client ready. Logged in as {discord_client.user.global_name} - Owned by {discord_client.owner}")
 
 @interactions.listen()
 async def on_message_create(event):
