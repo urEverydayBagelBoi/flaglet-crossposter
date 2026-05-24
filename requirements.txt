@@ -1,6 +1,7 @@
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.3
 aiosignal==1.4.0
+aiosqlite==0.22.1
 attrs==25.4.0
 audioop-lts==0.2.2
 croniter==6.0.0
