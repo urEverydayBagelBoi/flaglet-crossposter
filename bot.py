@@ -33,7 +33,7 @@ def read_config():
     return config_values
 
 config_values = None
-database = config_values['db_path']
+database = None
 
 # Logging
 import logging
@@ -73,7 +73,7 @@ crossposts_columns = {
 }
 
 async def create_tables():
-    # // create tables if they don't exist
+    '''Create tables if they don't exist.'''
     crossposts_columns_string = ""
     for k, v in crossposts_columns.items():
         crossposts_columns_string += f'"{k}" {v},\n'
@@ -87,9 +87,12 @@ async def create_tables():
         ''')
         await conn.commit()
 
-async def verify_columns(table_name, columns):
-    if not isinstance(columns, dict):
-        raise ValueError('Columns parameter must be a dictionary')
+async def verify_columns(table_name, columns: dict):
+    """Verify that passed table contains columns passed in columns dictionary.
+    
+    Implicitly uses the local 'database' variable as the target database.
+    Assumes that the passed table exists.
+    """
 
     async with aiosqlite.connect(database) as conn:
         async with await conn.execute(f'PRAGMA table_info({table_name})') as cursor:
@@ -109,6 +112,7 @@ async def verify_columns(table_name, columns):
         except aiosqlite.Error as e:
             await conn.rollback()
             logging.error(f"[verify_columns() ERROR]: {e}")
+
 
 
 # Artpost class
@@ -135,6 +139,7 @@ class crosspost:
             raise ValueError("art_message *and* queue_message were provided. Please only provide one.")
 
         if art_message:
+            pass
             # TODO
             # Try to reconstruct from existing data in db
             # using art_message to index.abs
@@ -142,6 +147,7 @@ class crosspost:
             # This variable will be caught later to create it.
         
         if queue_message:
+            pass
             # TODO
             # Do the same thing as with art_message
             # but use queue_message to query instead
@@ -175,12 +181,13 @@ async def on_message_create(event):
     content = event.message.content
     if not event.message.author.id == discord_client.user.id and ("!art " in content or content.endswith("!art")):
         attachment_urls = " ".join([attachment.url for attachment in event.message.attachments])
-        msg = f"Original Message: {event.message.jump_url}\nAuthor: {event.message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"
+        msg = f"Original Message: {event.message.jump_url}\nAuthor: {event.message.author.mention}\n\n> {content}"
+        if not (attachment_urls is None or attachment_urls != ""):
+            msg += "\n\n-# {attachment_urls}"
         discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
     
         _ = await discord_client.fetch_channel(config_values['discord_art_channel'])
         await _.send(msg)
-
 
 if __name__ == "__main__":
     if not os.path.exists('config.ini'):
@@ -189,5 +196,5 @@ if __name__ == "__main__":
     else:
         config_values = read_config()
         database = config_values['db_path']
-        print(config_values)
+        # print(config_values)
         discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
