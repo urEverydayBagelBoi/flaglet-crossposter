@@ -60,7 +60,7 @@ crossposts_columns = {
     'source_platform': 'TEXT NOT NULL',
     'created': 'INTEGER NOT NULL', # stored as unix timestamp
     'status': 'TEXT NOT NULL DEFAULT pending',
-    'approved': 'INTEGER', # stored as unix timestamp
+    'resolved': 'INTEGER', # stored as unix timestamp
 
     'art_message_id': 'INTEGER NOT NULL UNIQUE',
     'art_message_channel_id': 'INTEGER NOT NULL',
@@ -89,7 +89,7 @@ async def create_tables():
 
 async def verify_columns(table_name, columns):
     if not isinstance(columns, dict):
-        raise ValueError('usrdb.verify_columns(): columns parameter must be a dictionary')
+        raise ValueError('Columns parameter must be a dictionary')
 
     async with aiosqlite.connect(database) as conn:
         async with await conn.execute(f'PRAGMA table_info({table_name})') as cursor:
@@ -108,11 +108,26 @@ async def verify_columns(table_name, columns):
             await conn.commit()
         except aiosqlite.Error as e:
             await conn.rollback()
-            logging.error(f"[USRDB 'verify_columns' ERROR]: {e}")
+            logging.error(f"[verify_columns() ERROR]: {e}")
 
 
 # Artpost class
 class crosspost:
+    '''Represents a crosspost from any specific platform.
+
+    Keeps track of:
+    - Resolve status
+    - Datetime of creation and resolve
+    - Origin Platform
+    - Locally related messages (queue messages and the art post they refer to)
+    - Crossposted messages (if any)
+    
+    Functions:
+    - Completely purge a crosspost all at once from all platforms (emergencies)
+    - Approve or deny a crosspost
+    - Abstract interfacing with items stored in SQL
+
+    '''
     def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage | None, queue_message: DiscordMessage | None):
         if art_message is None and queue_message is None:
             raise ValueError("Neither art_message object nor queue_message object were provided!!")
@@ -132,13 +147,13 @@ class crosspost:
             # but use queue_message to query instead
 
         if not exists:
-            self.created = datetime.datetime.now()
-            self.art_message = art_message
+            self._created = datetime.datetime.now()
+            self._art_message = art_message
 
             # if type(art_message) == DiscordMessage:
             if isinstance(art_message, DiscordMessage):
-                self.author = art_message.author
-                self.platform = "discord"
+                self._author = art_message.author
+                self._platform = "discord"
                 # TODO: Send a queue message and set queue_message to that message object
 
             self.status = "pending"
