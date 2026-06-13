@@ -1,5 +1,6 @@
 # Basic utilities
 import datetime
+import asyncio
 
 # Read .env (tokens, etc.)
 from py_dotenv import read_dotenv
@@ -57,6 +58,7 @@ discord_client = interactions.Client(
 import aiosqlite
 # These are hardcoded here
 crossposts_columns = {
+    'id': 'INTEGER NOT NULL UNIQUE',
     'source_platform': 'TEXT NOT NULL',
     'created': 'INTEGER NOT NULL', # stored as unix timestamp
     'status': 'TEXT NOT NULL DEFAULT pending',
@@ -68,8 +70,7 @@ crossposts_columns = {
     'queue_message_id': 'INTEGER',
     'queue_message_channel_id': 'INTEGER',
 
-    'discord_crosspost_id': 'INTEGER',
-    'stoat_crosspost_id': 'INTEGER',
+    'discord_original_post_id': 'INTEGER',
 }
 
 async def create_tables():
@@ -113,7 +114,9 @@ async def verify_columns(table_name, columns: dict):
             await conn.rollback()
             logging.error(f"[verify_columns() ERROR]: {e}")
 
-
+async def setup_database():
+    await create_tables()
+    await verify_columns('crossposts', crossposts_columns)
 
 # Artpost class
 class crosspost:
@@ -190,11 +193,17 @@ async def on_message_create(event):
         await _.send(msg)
 
 if __name__ == "__main__":
+    init = True
     if not os.path.exists('config.ini'):
         create_config()
         print("Config file created. Please edit it before running bot.py again.")
-    else:
-        config_values = read_config()
+        init = False
+    if not os.path.exists(config_values['db_path']):
         database = config_values['db_path']
+        asyncio.run(setup_database())
+        init = False
+
+    if init == True:
+        config_values = read_config()
         # print(config_values)
         discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
