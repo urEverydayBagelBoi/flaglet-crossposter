@@ -153,24 +153,33 @@ class crosspost:
             - created           datetime.datetime
             - status            "approved", "denied", "purged", "pending"
             - resolved          datetime.datetime
-        Varying form per platform:
+        Varying form per source platform:
             - art_message_id
             - art_message_channel_id
             - author_id
-            - queue_message_id
-            - queue_message_channel_id
+            May be None:
+                - queue_message_id
+                - queue_message_channel_id
         None if source platform = destination platform:
             - discord_original_post_id
             - stoat_original_post_id
     '''
     def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage | None, queue_message: DiscordMessage | None):
-        # Universal
-        # id = None
-        # source_platform = None
-        # created = None
-        # status = None
-        # resolved = None
-
+        '''
+        sqlite db stores:
+            Universal:
+                - crosspost_id      = local identifier, totally seperate from platforms
+                - source_platform   = "discord", can be "stoat" or other in the future
+                - created           = UNIX timestamp
+                - status            = string; "approved", "denied", "purged" or "pending"
+                - resolved          = UNIX timestamp *or* None
+            Varying in form per source platform:
+                - art_message_id
+                - art_message_channel_id
+                - author_id
+                - queue_message_id
+                - queue_message_channel_id
+        '''
         if art_message is None and queue_message is None:
             raise ValueError("Neither art_message object nor queue_message object were provided!!")
         if art_message is not None and queue_message is not None:
