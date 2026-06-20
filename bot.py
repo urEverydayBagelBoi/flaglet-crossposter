@@ -27,10 +27,18 @@ def read_config():
     config = configparser.ConfigParser()
     config.read('config.ini')
     config_values = {
-        'discord_art_channel': int(config.get('Discord', 'art_channel')),
-        'discord_approval_channel': int(config.get('Discord', 'approval_channel')),
+        'discord_art_channel': config.get('Discord', 'art_channel'),
+        'discord_approval_channel': config.get('Discord', 'approval_channel'),
         'db_path': config.get('Database', 'path'),
     }
+    # Sanity Checks
+    for k, v in config_values.items():
+        if 'discord' in k:
+            if 'channel' in k:
+                #if type(v) is not interactions.models.discord.Snowflake_Type:
+                if not isinstance(v, interactions.models.discord.Snowflake):
+                    raise ValueError(f"read_config(): Invalid config option: {k}={v}")
+
     return config_values
 
 config_values = None
@@ -73,13 +81,13 @@ crossposts_columns = {
     'discord_original_post_id': 'INTEGER',
 }
 
-async def create_tables():
+async def create_tables(conn):
     '''Create tables if they don't exist.'''
     crossposts_columns_string = ""
     for k, v in crossposts_columns.items():
         crossposts_columns_string += f'"{k}" {v},\n'
 
-    async with aiosqlite.connect(database) as conn:
+    try:
         await conn.execute(f'''
             CREATE TABLE IF NOT EXISTS "crossposts" (
                 {crossposts_columns_string}
@@ -87,36 +95,40 @@ async def create_tables():
             );
         ''')
         await conn.commit()
+    except aiosqlite.Error as e:
+        await conn.rollback()
+        logging.error(f"[verify_columns() ERROR]: {e}")
 
-async def verify_columns(table_name, columns: dict):
+async def verify_columns(conn, table_name, columns: dict):
     """Verify that passed table contains columns passed in columns dictionary.
     
     Implicitly uses the local 'database' variable as the target database.
     Assumes that the passed table exists.
     """
 
-    async with aiosqlite.connect(database) as conn:
-        async with await conn.execute(f'PRAGMA table_info({table_name})') as cursor:
-            existing_columns = await cursor.fetchall()
-        logging.info(f"    [existing_columns]: {existing_columns}")
-        existing_column_names = ['id'] + [column[1] for column in existing_columns]
-        logging.info(f"Verifying table [{table_name}]")
-        await conn.execute('BEGIN;')
-        try:
-            for column_name, column_definition in columns.items():
-                if column_name not in existing_column_names:
-                    await conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition};')
-                    logging.info(f"Added column '{column_name}' to {table_name}")
-                else:
-                    logging.info(f"Column '{column_name}' already exists in {table_name}")
-            await conn.commit()
-        except aiosqlite.Error as e:
-            await conn.rollback()
-            logging.error(f"[verify_columns() ERROR]: {e}")
+    async with await conn.execute(f'PRAGMA table_info({table_name})') as cursor:
+        existing_columns = await cursor.fetchall()
+    logging.info(f"    [existing_columns]: {existing_columns}")
+    existing_column_names = ['id'] + [column[1] for column in existing_columns]
+    logging.info(f"Verifying table [{table_name}]")
+    await conn.execute('BEGIN;')
+    try:
+        for column_name, column_definition in columns.items():
+            if column_name not in existing_column_names:
+                await conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition};')
+                logging.info(f"Added column '{column_name}' to {table_name}")
+            else:
+                logging.info(f"Column '{column_name}' already exists in {table_name}")
+        await conn.commit()
+    except aiosqlite.Error as e:
+        await conn.rollback()
+        logging.error(f"[verify_columns() ERROR]: {e}")
 
-async def setup_database():
-    await create_tables()
-    await verify_columns('crossposts', crossposts_columns)
+async def setup_database(db_path):
+    logging.info(f'Setting up database with path: {db_path}')
+    async with aiosqlite.connect(db_path) as conn:
+        await create_tables(conn)
+        await verify_columns(conn, 'crossposts', crossposts_columns)
 
 # Artpost class
 class crosspost:
@@ -198,12 +210,13 @@ if __name__ == "__main__":
         create_config()
         print("Config file created. Please edit it before running bot.py again.")
         init = False
-    if not os.path.exists(config_values['db_path']):
-        database = config_values['db_path']
-        asyncio.run(setup_database())
-        init = False
-
-    if init == True:
+    if config_values is None:
         config_values = read_config()
+    if config_values is not None and not os.path.exists(config_values['db_path']):
+        database = config_values['db_path']
+        logging.info(f'db_path: {database}')
+        asyncio.run(setup_database(database))
+
+    if init != False:
         # print(config_values)
         discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
