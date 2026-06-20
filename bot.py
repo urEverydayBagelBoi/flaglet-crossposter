@@ -146,8 +146,31 @@ class crosspost:
     - Approve or deny a crosspost
     - Abstract interfacing with items stored in SQL
 
+    Attributes:
+        Universal:
+            - id                int
+            - source_platform   "discord", will be expanded with "stoat", etc.
+            - created           datetime.datetime
+            - status            "approved", "denied", "purged", "pending"
+            - resolved          datetime.datetime
+        Varying form per platform:
+            - art_message_id
+            - art_message_channel_id
+            - author_id
+            - queue_message_id
+            - queue_message_channel_id
+        None if source platform = destination platform:
+            - discord_original_post_id
+            - stoat_original_post_id
     '''
     def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage | None, queue_message: DiscordMessage | None):
+        # Universal
+        # id = None
+        # source_platform = None
+        # created = None
+        # status = None
+        # resolved = None
+
         if art_message is None and queue_message is None:
             raise ValueError("Neither art_message object nor queue_message object were provided!!")
         if art_message is not None and queue_message is not None:
@@ -168,13 +191,13 @@ class crosspost:
             # but use queue_message to query instead
 
         if not exists:
-            self._created = datetime.datetime.now()
-            self._art_message = art_message
+            self.created = datetime.datetime.now()
+            self.art_message = art_message
 
             # if type(art_message) == DiscordMessage:
             if isinstance(art_message, DiscordMessage):
-                self._author = art_message.author
-                self._platform = "discord"
+                self.author = art_message.author
+                self.source_platform = "discord"
                 # TODO: Send a queue message and set queue_message to that message object
 
             self.status = "pending"
