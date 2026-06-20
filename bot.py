@@ -211,12 +211,21 @@ if __name__ == "__main__":
         print("Config file created. Please edit it before running bot.py again.")
         init = False
     if config_values is None:
-        config_values = read_config()
+        try:
+            config_values = read_config()
+        except:
+            raise AssertionError("Failed to read config. Did you use the right syntax?")
+            init = False
     if config_values is not None and not os.path.exists(config_values['db_path']):
         database = config_values['db_path']
-        logging.info(f'db_path: {database}')
-        asyncio.run(setup_database(database))
+        logging.debug(f'db_path: {database}')
+        try:
+            asyncio.run(setup_database(database))
+        except aiosqlite.Error as e:
+            logging.error(f"Error while attempting to create database. aiosqlite error: {e}")
+    if os.path.exists(config_values['db_path']):
+        raise AssertionError("Could not create database. Did you specify the path correctly in the config?")
 
-    if init != False:
+    if init:
         # print(config_values)
         discord_client.start(token=(os.getenv('DISCORD_TOKEN')))
