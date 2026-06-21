@@ -166,24 +166,24 @@ class crosspost:
             - stoat_original_post       message object
     '''
     def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage | None, queue_message: DiscordMessage | None):
-        if art_message is None and queue_message is None:
-            raise ValueError("Neither art_message object nor queue_message object were provided!!")
-        if art_message is not None and queue_message is not None:
-            raise ValueError("art_message *and* queue_message were provided. Please only provide one.")
-
         if art_message:
-            pass
+            ref_message = art_message
             # TODO
             # Try to reconstruct from existing data in db
             # using art_message to index.abs
             # If it doesn't exist, set exists = False and return.
             # This variable will be caught later to create it.
-        
-        if queue_message:
-            pass
+        elif queue_message:
+            ref_message = queue_message
             # TODO
             # Do the same thing as with art_message
             # but use queue_message to query instead
+            # if there's a queue message, a crosspost should be registered. Otherwise there's a db error.
+        # Invalid cases
+        elif queue_message and art_message:
+            raise ValueError("art_message *and* queue_message were provided. Please only provide one.")
+        else:
+            raise ValueError("Neither art_message object nor queue_message object were provided!!")
 
         if not exists:
             self.created = datetime.datetime.now()
@@ -200,7 +200,8 @@ class crosspost:
             self.status = "pending"
         
     def _store(self):
-        '''sqlite db stores:
+        '''
+        sqlite db stores:
             Universal:
                 - crosspost_id      = int - local identifier, totally seperate from platforms
                 - source_platform   = string - "discord", can be "stoat" or other in the future
@@ -213,6 +214,8 @@ class crosspost:
                 - author_id
                 - queue_message_id
                 - queue_message_channel_id
+        Returns:
+        int: id in db
         '''
        # Store self in db.
         # See __init__ docstring for db formatting details
@@ -235,7 +238,6 @@ async def on_message_create(event):
         if not (attachment_urls is None or attachment_urls != ""):
             msg += "\n\n-# {attachment_urls}"
         discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
-    
         _ = await discord_client.fetch_channel(config_values['discord_art_channel'])
         await _.send(msg)
 
