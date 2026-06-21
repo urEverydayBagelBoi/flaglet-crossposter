@@ -166,21 +166,6 @@ class crosspost:
             - stoat_original_post       message object
     '''
     def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage | None, queue_message: DiscordMessage | None):
-        '''
-        sqlite db stores:
-            Universal:
-                - crosspost_id      = int - local identifier, totally seperate from platforms
-                - source_platform   = string - "discord", can be "stoat" or other in the future
-                - created           = UNIX timestamp (int)
-                - status            = string - "approved", "denied", "purged" or "pending"
-                - resolved          = UNIX timestamp (int) *or* None
-            Varying in form per source platform:
-                - art_message_id
-                - art_message_channel_id
-                - author_id
-                - queue_message_id
-                - queue_message_channel_id
-        '''
         if art_message is None and queue_message is None:
             raise ValueError("Neither art_message object nor queue_message object were provided!!")
         if art_message is not None and queue_message is not None:
@@ -215,7 +200,21 @@ class crosspost:
             self.status = "pending"
         
     def _store(self):
-        # Store self in db.
+        '''sqlite db stores:
+            Universal:
+                - crosspost_id      = int - local identifier, totally seperate from platforms
+                - source_platform   = string - "discord", can be "stoat" or other in the future
+                - created           = UNIX timestamp (int)
+                - status            = string - "approved", "denied", "purged" or "pending"
+                - resolved          = UNIX timestamp (int) *or* None
+            Varying in form per source platform:
+                - art_message_id
+                - art_message_channel_id
+                - author_id
+                - queue_message_id
+                - queue_message_channel_id
+        '''
+       # Store self in db.
         # See __init__ docstring for db formatting details
         # TODO
         pass
