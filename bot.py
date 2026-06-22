@@ -50,8 +50,8 @@ import logging
 logging.basicConfig()
 discord_log = logging.getLogger("DiscordLog")
 discord_log.setLevel(logging.INFO)
-main_log = logging.getLogger("MainLog")
-main_log.setLevel(logging.DEBUG)
+# main_log = logging.getLogger("MainLog")
+# main_log.setLevel(logging.DEBUG)
 
 # Discord Client
 import interactions
@@ -65,11 +65,13 @@ discord_client = interactions.Client(
     logger=discord_log
 )
 
+
 # //// Data ////
 import aiosqlite
 # These are hardcoded here
 crossposts_columns = {
-    'id': 'INTEGER NOT NULL UNIQUE',
+    # should just use rowid instead
+    # 'id': 'INTEGER AUTOINCREMENT',
     'source_platform': 'TEXT NOT NULL',
     'created': 'INTEGER NOT NULL', # stored as unix timestamp
     'status': 'TEXT NOT NULL DEFAULT pending',
@@ -78,10 +80,10 @@ crossposts_columns = {
     'art_message_id': 'INTEGER NOT NULL UNIQUE',
     'art_message_channel_id': 'INTEGER NOT NULL',
     'author_id': 'INTEGER NOT NULL',
-    'queue_message_id': 'INTEGER',
-    'queue_message_channel_id': 'INTEGER',
+    'queue_message_id': 'INTEGER NOT NULL',
+    'queue_message_channel_id': 'INTEGER NOT NULL',
 
-    'discord_original_post_id': 'INTEGER',
+    'discord_crosspost_id': 'INTEGER',
 }
 
 async def create_tables(conn):
@@ -100,7 +102,7 @@ async def create_tables(conn):
         await conn.commit()
     except aiosqlite.Error as e:
         await conn.rollback()
-        main_log.error(f"[verify_columns() ERROR]: {e}")
+        logging.error(f"[verify_columns() ERROR]: {e}")
 
 async def verify_columns(conn, table_name, columns: dict):
     """Verify that passed table contains columns passed in columns dictionary.
@@ -111,24 +113,24 @@ async def verify_columns(conn, table_name, columns: dict):
 
     async with await conn.execute(f'PRAGMA table_info({table_name})') as cursor:
         existing_columns = await cursor.fetchall()
-    main_log.info(f"    [existing_columns]: {existing_columns}")
+    logging.info(f"    [existing_columns]: {existing_columns}")
     existing_column_names = ['id'] + [column[1] for column in existing_columns]
-    main_log.info(f"Verifying table [{table_name}]")
+    logging.info(f"Verifying table [{table_name}]")
     await conn.execute('BEGIN;')
     try:
         for column_name, column_definition in columns.items():
             if column_name not in existing_column_names:
                 await conn.execute(f'ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition};')
-                main_log.info(f"Added column '{column_name}' to {table_name}")
+                logging.info(f"Added column '{column_name}' to {table_name}")
             else:
-                main_log.info(f"Column '{column_name}' already exists in {table_name}")
+                logging.info(f"Column '{column_name}' already exists in {table_name}")
         await conn.commit()
     except aiosqlite.Error as e:
         await conn.rollback()
-        main_log.error(f"[verify_columns() ERROR]: {e}")
+        logging.error(f"[verify_columns() ERROR]: {e}")
 
 async def setup_database(db_path):
-    main_log.info(f'Setting up database with path: {db_path}')
+    logging.info(f'Setting up database with path: {db_path}')
     async with aiosqlite.connect(db_path) as conn:
         await create_tables(conn)
         await verify_columns(conn, 'crossposts', crossposts_columns)
@@ -169,7 +171,12 @@ class crosspost:
             Soon(tm):
             - stoat_crosspost       message object
     '''
-    async def __init__(self, conn: aiosqlite.Connection, art_message: DiscordMessage=None, queue_message: DiscordMessage=None):
+    async def __init__(
+        self,
+        conn: aiosqlite.Connection,
+        art_message: DiscordMessage=None,
+        queue_message: DiscordMessage=None,
+    ):
         if art_message:
             ref_message = art_message
             # TODO
@@ -191,8 +198,10 @@ class crosspost:
         else:
             raise ValueError("Neither art_message object nor queue_message object were provided!!")
         if not exists:
+            # Construct from scratch
             self.created = datetime.datetime.now()
             self.art_message = art_message
+            self.discord_crosspost = None
             if isinstance(art_message, DiscordMessage):
                 self.source_platform = "discord"
                 self.author = art_message.author
@@ -204,38 +213,20 @@ class crosspost:
                 # fields = []
                 for attachment in art_message.attachments:
                     embed_attachment = interactions.EmbedAttachment(url=attachment.url, proxy_url=attachment.proxy_url)
-                    main_log.debug(f'Attachment sent of content type: {attachment.content_type}')
+                    logging.debug(f'Attachment created of content type: {attachment.content_type}')
                     if attachment.content_type == 'image':
                         image_attachments.append(embed_attachment)
-                    # else:
-                    #     fields += interactions.EmbedField(
-                    #         name=f'{attachment.filename} - {attachment.content_type}',
-                    #         value=attachment.url,
-                    #     )
-                # if fields == []:
-                #     fields = None
                 author = interactions.EmbedAuthor(
                     name=art_message.author.username,
                     url=f'https://discordapp.com/users/{art_message.author.id}',
                     icon_url=art_message.author.avatar_url,
                 )
-                # embed = interactions.Embed(
-                #     author=author,
-                #     description=art_message.content,
-                #     timestamp=art_message.created_at,
-                #     url=art_message.jump_url,
-                #     footer=f"Original Message: {art_message.jump_url}",
-                #     provider=interactions.EmbedProvider(name="Flaglet Bridge"),
-                #     images=image_attachments,
-                #     fields=fields
-                # ),
                 args = {
                     'title': f'{self.art_message.author.display_name} posted some art! (click to jump)',
                     'url': self.art_message.jump_url,
                     'author': author,
                     'description': str(self.art_message.content),
                     'timestamp': self.art_message.created_at,
-                    'images': image_attachments,
                 }
                 if image_attachments != []:
                     args['images'] = image_attachments
@@ -243,10 +234,14 @@ class crosspost:
                 embed = interactions.Embed(**args)
                 self.queue_message = await queue_channel.send(embed=embed)
             self.status = "pending"
+            await self._store(conn)
         self.new = not exists
 
+    # TODO: add stoat messages as a valid type for art_message or queue_message when thats implemented
+    async def _load(self, conn:aiosqlite.Connection, art_message:interactions.Message=None, queue_message:interactions.Message=None):
+        pass
         
-    def _store(self):
+    async def _store(self, conn:aiosqlite.Connection, values:dict=None):
         '''
         sqlite db stores:
             Universal:
@@ -264,30 +259,89 @@ class crosspost:
         Returns:
         int: id in db
         '''
-       # Store self in db.
-        # See __init__ docstring for db formatting details
-        # TODO
-        pass
+
+        try:
+            if await conn.execute(f"SELECT EXISTS(SELECT 1 FROM crossposts WHERE art_message_id={self.art_message.id})") is True:
+                exists = True
+            else:
+                exists = False
+        except aiosqlite.Error as e:
+            logging.error(f"crosspost._store(): Error when trying to check db for existence of crosspost object: {e}\n{self.__str__}")
+        if values is None:
+            # Update all values in db
+            # Note: id is not provided because SQL(ite) auto-increments it
+            values = {
+                'source_platform': self.source_platform,
+                'created': self.created,
+                'status': self.status,
+                'resolved': self.status if self.status is not None else "NULL",
+
+                'art_message_id': self.art_message.id,
+                'art_message_channel_id': self.art_message.channel.id,
+                'author_id': self.author.id,
+                'queue_message_id': self.queue_message.id,
+                'queue_message_channel_id': self.queue_message.channel.id,
+
+                'discord_crosspost_id': self.discord_crosspost if self.discord_crosspost is not None else "NULL",
+            }
+            insert_string = f'INSERT INTO crossposts'
+        elif exists: # and theres values passed
+            insert_string = f'INSERT INTO crossposts ({', '.join(key for key in values.keys())})'
+        else:
+            exists = 'already exists' if exists else 'does not exist'
+            provided = 'were provided' if values else 'were not provided'
+            raise AssertionError(f'crosspost._store(): Object {exists} in database and values to update {provided}. This is an invalid combination.')
+            # ... probably :3
+            # no think just click clack
+
+        # values_string = ', '.join(v for v in values.values())
+        values_string = ', '.join('?' for v in values.values())
+        set_string = ', '.join(f'{k} = {v}' for k, v in values.items())
+
+        try:
+            if not exists:
+                await conn.execute(
+                f'''
+                    {insert_string}
+                    VALUES ({values_string})
+                ''',
+                tuple(values.values()),
+                )
+            else:
+                await conn.execute(f'''
+                    UPDATE crossposts
+                    SET {set_string}
+                    WHERE art_message_id = {self.art_message.id}
+                ''')
+            await conn.commit()
+        except aiosqlite.Error as e:
+            logging.error(f'crosspost._store() Error: {e}')
+            await conn.rollback()
     
-    def __repr__(self):
+    def __str__(self):
         # TODO:
-        # this errors because some might be none
-        # put 'None' as a string wherever the actual value is None
+        # caveman fixed errors being thrown here because some attribute doesn't exist
+        # should somehow put 'None' as a string wherever an attribute doesn't exist or the value itself is None
         return f'''
         //// Crosspost ////
-        ID:                     {self.id}
+        ID:                     None (for now)
         source_platform:        {self.source_platform}
         created:                {self.created}
         status:                 {self.status}
-        resolved:               {self.resolved}
+        resolved:               None (for now)
         new?:                   {self.new}
         art_message:            {self.art_message}
         art_message channel:    {self.art_message.channel}
         author:                 {self.author}
         queue_message:          {self.queue_message}
         queue_message channel:  {self.queue_message.channel}
-        discord_crosspost:      {self.discord_crosspost}
+        discord_crosspost:      None (for now)
         '''
+
+
+async def crosspost_exists(conn:aiosqlite.Connection, art_message:interactions.Message=None, queue_message:interactions.Message=None):
+    # TODO
+    pass
 
 
 
@@ -308,9 +362,11 @@ async def on_message_create(event):
         discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
         _ = await discord_client.fetch_channel(config_values['discord_art_channel'])
         await _.send(msg)
-    # TODO: Temp
-    if not event.message.author.id == discord_client.user.id:
-        main_log.debug(await crosspost(await aiosqlite.connect(database), event.message))
+
+    # testing purposes
+    # if not event.message.author.id == discord_client.user.id:
+    #     async with aiosqlite.connect(config_values['db_path']) as conn:
+    #         logging.debug(await crosspost(conn, event.message))
 
 if __name__ == "__main__":
     init = True
@@ -326,12 +382,12 @@ if __name__ == "__main__":
             init = False
     if config_values is not None and not os.path.exists(config_values['db_path']):
         database = config_values['db_path']
-        main_log.debug(f'db_path: {database}')
+        logging.debug(f'db_path: {database}')
         try:
-            asyncio.run(setup_database(database))
+            asyncio.run(setup_database(db_path))
         except aiosqlite.Error as e:
-            main_log.error(f"Error while attempting to create database. aiosqlite error: {e}")
-    if not os.path.exists(config_values['db_path']):
+            logging.error(f"Error while attempting to create database. aiosqlite error: {e}")
+    if config_values is not None and not os.path.exists(config_values['db_path']):
         raise AssertionError("Database did not exist after creation attempt. Did you specify the path correctly in the config?")
 
     if init:
