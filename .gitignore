@@ -209,3 +209,5 @@ __marimo__/
 # Custom
 .DS_Store
 config.ini
+.vscode/launch.json
+*.db
