@@ -1,11 +1,11 @@
-# Read .env (tokens, etc.)
+# // Environment Variables //
 from py_dotenv import read_dotenv
 import os
 
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 read_dotenv(dotenv_path)
 
-# Config File
+# // Config File //
 import configparser
 
 
@@ -27,14 +27,14 @@ def read_config():
 
 config_values = None
 
-# Logging
+# // Logging //
 import logging
 
 logging.basicConfig()
 discord_log = logging.getLogger("FlagletLogger")
 discord_log.setLevel(logging.DEBUG)
 
-# Discord Client
+# // Discord //
 import interactions
 from interactions import Intents as DiscordIntents
 
