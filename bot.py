@@ -1,3 +1,4 @@
+debug_mode = False
 # // Environment Variables //
 from py_dotenv import read_dotenv
 import os
@@ -34,11 +35,11 @@ main_log = logging.getLogger('main')
 main_log.setLevel(logging.DEBUG)
 
 main_file_handler = logging.FileHandler('main.log')
-main_file_handler.setLevel(logging.DEBUG)
+main_file_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
 main_log.addHandler(main_file_handler)
 
 main_stream_handler = logging.StreamHandler()
-main_stream_handler.setLevel(logging.DEBUG)
+main_stream_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
 main_log.addHandler(main_stream_handler)
 
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
