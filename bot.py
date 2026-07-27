@@ -67,9 +67,9 @@ async def on_message(message):
     main_log.debug(f"Discord message received: {message.content}")
     content = message.content
     if not message.author.id == discord_client.user.id and (
-        "#art " in content or content.endswith("#art")
+        "!art " in content or content.endswith("!art")
     ):
-        main_log.debug("#art messsage detected")
+        main_log.debug("!art messsage detected")
         attachment_urls = " ".join(
             [attachment.url for attachment in message.attachments]
         )
