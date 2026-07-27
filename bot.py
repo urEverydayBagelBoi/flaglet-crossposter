@@ -30,42 +30,50 @@ config_values = None
 # // Logging //
 import logging
 
-logging.basicConfig()
-discord_log = logging.getLogger("FlagletLogger")
-discord_log.setLevel(logging.DEBUG)
+main_log = logging.getLogger('main')
+main_log.setLevel(logging.DEBUG)
+
+main_file_handler = logging.FileHandler('main.log')
+main_file_handler.setLevel(logging.DEBUG)
+main_log.addHandler(main_file_handler)
+
+main_stream_handler = logging.StreamHandler()
+main_stream_handler.setLevel(logging.DEBUG)
+main_log.addHandler(main_stream_handler)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+main_file_handler.setFormatter(formatter)
+main_stream_handler.setFormatter(formatter)
+
+discord_log_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 
 # // Discord //
-import interactions
-from interactions import Intents as DiscordIntents
-
-# from interactions.api.events import Component
-
-discord_client = interactions.Client(
-    intents=DiscordIntents.DEFAULT | DiscordIntents.MESSAGE_CONTENT,
-    asyncio_debug=True,
-    logger=discord_log,
-)
+import discord
+intents = discord.Intents.default()
+intents.message_content = True
+discord_client = discord.Client(intents=intents)
 
 
-@interactions.listen()
+@discord_client.event
 async def on_ready():
-    discord_log.info(
-        f"Discord client ready. Logged in as {discord_client} - Owned by {discord_client.owner}"
+    main_log.info(
+        f"Discord client ready. Logged in as {discord_client.user.name} - Owned by {discord_client.application.owner}"
     )
 
 
-@interactions.listen()
-async def on_message_create(event):
-    # discord_log.debug(f"Discord message received: {event.message.content}")
-    content = event.message.content
-    if not event.message.author.id == discord_client.user.id and (
+@discord_client.event
+async def on_message(message):
+    main_log.debug(f"Discord message received: {message.content}")
+    content = message.content
+    if not message.author.id == discord_client.user.id and (
         "#art " in content or content.endswith("#art")
     ):
+        main_log.debug("#art messsage detected")
         attachment_urls = " ".join(
-            [attachment.url for attachment in event.message.attachments]
+            [attachment.url for attachment in message.attachments]
         )
-        msg = f"Original Message: {event.message.jump_url}\nAuthor: {event.message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"
-        # discord_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
+        msg = f"""Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"""
+        main_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
 
         _ = await discord_client.fetch_channel(config_values["discord_art_channel"])
         await _.send(msg)
@@ -77,5 +85,7 @@ if __name__ == "__main__":
         print("Config file created. Please edit it before running bot.py again.")
     else:
         config_values = read_config()
-        print(config_values)
-        discord_client.start(token=(os.getenv("DISCORD_TOKEN")))
+        if config_values is None:
+            raise AssertionError("config_values was none after reading")
+        main_log.debug(config_values)
+        discord_client.run(token=os.getenv('DISCORD_TOKEN'), log_handler=discord_log_handler)
