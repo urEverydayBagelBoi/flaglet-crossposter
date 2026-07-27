@@ -73,7 +73,10 @@ async def on_message(message):
         attachment_urls = " ".join(
             [attachment.url for attachment in message.attachments]
         )
-        msg = f"""Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}\n\n-# {attachment_urls}"""
+        msg = f"Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}"
+        if attachment_urls is not "":
+            msg += f"-# {attachment_urls}"
+
         main_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
 
         _ = await discord_client.fetch_channel(config_values["discord_art_channel"])
