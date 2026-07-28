@@ -1,4 +1,4 @@
-debug_mode = False
+debug_mode = True
 # // Environment Variables //
 from py_dotenv import read_dotenv
 import os
@@ -50,38 +50,35 @@ discord_log_handler = logging.FileHandler(filename='discord.log', encoding='utf-
 
 # // Discord //
 import discord
-intents = discord.Intents.default()
-intents.message_content = True
-discord_client = discord.Client(intents=intents)
-
-
-@discord_client.event
-async def on_ready():
-    main_log.info(
-        f"Discord client ready. Logged in as {discord_client.user.name} - Owned by {discord_client.application.owner}"
-    )
-
-
-@discord_client.event
-async def on_message(message):
-    main_log.debug(f"Discord message received: {message.content}")
-    content = message.content
-    if not message.author.id == discord_client.user.id and (
-        "!art " in content or content.endswith("!art")
-    ):
-        main_log.debug("!art messsage detected")
-        attachment_urls = " ".join(
-            [attachment.url for attachment in message.attachments]
+class DiscordClient(discord.Client):
+    async def on_ready(self):
+        main_log.info(
+            f"Discord client ready. Logged in as {self.user.name} - Owned by {self.application.owner}"
         )
-        msg = f"Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}"
-        if attachment_urls is not "":
-            msg += f"-# {attachment_urls}"
 
-        main_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
 
-        _ = await discord_client.fetch_channel(config_values["discord_art_channel"])
-        await _.send(msg)
+    async def on_message(self, message):
+        main_log.debug(f"Discord message received: {message.content}")
+        content = message.content
+        if not message.author.id == self.user.id and (
+            "!art " in content or content.endswith("!art")
+        ):
+            main_log.debug("!art messsage detected")
+            attachment_urls = " ".join(
+                [attachment.url for attachment in message.attachments]
+            )
+            msg = f"Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}"
+            if attachment_urls != "":
+                msg += f"-# {attachment_urls}"
 
+            main_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
+
+            _ = await self.fetch_channel(config_values["discord_art_channel"])
+            await _.send(msg)
+
+discord_intents = discord.Intents.default()
+discord_intents.message_content = True
+discord_client = DiscordClient(intents=discord_intents)
 
 if __name__ == "__main__":
     if not os.path.exists("config.ini"):
