@@ -16,7 +16,7 @@ def create_config():
         "debug": False,
     }
     config["discord"] = {
-        "art_channel": "channel_id",
+        "crosspost_channel": "channel_id",
     }
     with open("config.ini", "w") as config_file:
         config.write(config_file)
@@ -25,7 +25,7 @@ def create_config():
 def read_config():
     config = configparser.ConfigParser()
     config.read("config.ini")
-    # config_values = {"discord_art_channel": (config.get("Discord", "art_channel"))}
+    # config_values = {"discord_crosspost_channel": (config.get("Discord", "crosspost_channel"))}
     # return config_values
     if config['general']['debug'] is True:
         main_file_handler.setLevel(logging.DEBUG)
@@ -92,10 +92,10 @@ class DiscordClient(discord.Client):
                 msg += f"-# {attachment_urls}"
 
             main_log.debug(
-                f"Discord art channel from config: {config['discord']['art_channel']}"
+                f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
             )
 
-            _ = await self.fetch_channel(config["discord"]["art_channel"])
+            _ = await self.fetch_channel(config["discord"]["crosspost_channel"])
             await _.send(msg)
 
 
