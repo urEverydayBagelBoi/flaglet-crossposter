@@ -1,4 +1,3 @@
-debug_mode = True
 # // Environment Variables //
 from py_dotenv import read_dotenv
 import os
@@ -12,7 +11,11 @@ import configparser
 
 def create_config():
     config = configparser.ConfigParser()
-    config["Discord"] = {
+    config["general"] = {
+        "prefix": "!art",
+        "debug": False,
+    }
+    config["discord"] = {
         "art_channel": "channel_id",
     }
     with open("config.ini", "w") as config_file:
@@ -22,48 +25,65 @@ def create_config():
 def read_config():
     config = configparser.ConfigParser()
     config.read("config.ini")
-    config_values = {"discord_art_channel": (config.get("Discord", "art_channel"))}
-    return config_values
+    # config_values = {"discord_art_channel": (config.get("Discord", "art_channel"))}
+    # return config_values
+    if config['general']['debug'] is True:
+        main_file_handler.setLevel(logging.DEBUG)
+        main_stream_handler.setLevel(logging.DEBUG)
+    return config
 
 
-config_values = None
+# config_values = None
+config = None
 
 # // Logging //
 import logging
 
-main_log = logging.getLogger('main')
+main_log = logging.getLogger("main")
 main_log.setLevel(logging.DEBUG)
 
-main_file_handler = logging.FileHandler('main.log')
-main_file_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+main_file_handler = logging.FileHandler("main.log")
+main_file_handler.setLevel(logging.INFO)
 main_log.addHandler(main_file_handler)
 
 main_stream_handler = logging.StreamHandler()
-main_stream_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+main_stream_handler.setLevel(logging.INFO)
 main_log.addHandler(main_stream_handler)
 
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 main_file_handler.setFormatter(formatter)
 main_stream_handler.setFormatter(formatter)
 
-discord_log_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discord_log_handler = logging.FileHandler(
+    filename="discord.log", encoding="utf-8", mode="w"
+)
+
 
 # // Discord //
 import discord
+
+
 class DiscordClient(discord.Client):
+    crosspost_prefix = None
+
+    # Need a better solution for this
+    # def __init__(self, prefix):
+    #     super().__init__()
+    #     self.crosspost_prefix = config['general']['prefix']
+
     async def on_ready(self):
         main_log.info(
             f"Discord client ready. Logged in as {self.user.name} - Owned by {self.application.owner}"
         )
-
+        self.crosspost_prefix = config['general']['prefix']
 
     async def on_message(self, message):
         main_log.debug(f"Discord message received: {message.content}")
         content = message.content
         if not message.author.id == self.user.id and (
-            "!art " in content or content.endswith("!art")
+            self.crosspost_prefix + " " in content or content.endswith(self.crosspost_prefix)
         ):
-            main_log.debug("!art messsage detected")
+            main_log.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
             attachment_urls = " ".join(
                 [attachment.url for attachment in message.attachments]
             )
@@ -71,10 +91,13 @@ class DiscordClient(discord.Client):
             if attachment_urls != "":
                 msg += f"-# {attachment_urls}"
 
-            main_log.debug(f"Discord art channel from config: {config_values['discord_art_channel']}")
+            main_log.debug(
+                f"Discord art channel from config: {config['discord']['art_channel']}"
+            )
 
-            _ = await self.fetch_channel(config_values["discord_art_channel"])
+            _ = await self.fetch_channel(config["discord"]["art_channel"])
             await _.send(msg)
+
 
 discord_intents = discord.Intents.default()
 discord_intents.message_content = True
@@ -85,8 +108,10 @@ if __name__ == "__main__":
         create_config()
         print("Config file created. Please edit it before running bot.py again.")
     else:
-        config_values = read_config()
-        if config_values is None:
-            raise AssertionError("config_values was none after reading")
-        main_log.debug(config_values)
-        discord_client.run(token=os.getenv('DISCORD_TOKEN'), log_handler=discord_log_handler)
+        config = read_config()
+        if config is None:
+            raise AssertionError("config was none after reading")
+        main_log.debug(config)
+        discord_client.run(
+            token=os.getenv("DISCORD_TOKEN"), log_handler=discord_log_handler
+        )
