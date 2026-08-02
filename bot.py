@@ -55,20 +55,21 @@ class DiscordClient(discord.Client):
     #     self.crosspost_prefix = config['general']['prefix']
 
     async def on_ready(self):
+        self.crosspost_prefix = config['general']['prefix']
+        self.target_channel = await self.fetch_channel(config["discord"]["crosspost_channel"])
         MAIN_LOG.info(
             f"Discord client ready. Logged in as {self.user.name} - Owned by {self.application.owner}"
         )
-        # self.crosspost_prefix = config['general']['prefix']
-        # self.target_channel = await self.fetch_channel(config["discord"]["crosspost_channel"])
 
     async def on_message(self, message):
         MAIN_LOG.debug(f"Discord message received: {message.content}")
         content = message.content
-        prefix
+        prefix = self.crosspost_prefix
+
         if not message.author.id == self.user.id and (
-            self.crosspost_prefix + " " in content or content.endswith(self.crosspost_prefix)
+            prefix + " " in content or content.endswith(prefix)
         ):
-            MAIN_LOG.debug(f"Messsage with prefix {crosspost_prefix} detected")
+            MAIN_LOG.debug(f"Messsage with prefix {prefix} detected")
             attachment_urls = " ".join(
                 [attachment.url for attachment in message.attachments]
             )
@@ -93,11 +94,6 @@ if __name__ == "__main__":
     discord_intents = discord.Intents.default()
     discord_intents.message_content = True
     discord_client = DiscordClient(intents=discord_intents)
-
-    try: 
-        discord_client.target_channel = discord.utils.get(discord.Client.get_channel(config["discord"]["crosspost_channel"]))
-    except KeyError:
-        MAIN_LOG.error("No crosspost channel ID found in config.")
 
     discord_client.run(
         token=os.getenv("DISCORD_TOKEN"), log_handler=DISCORD_LOG_HANDLER
