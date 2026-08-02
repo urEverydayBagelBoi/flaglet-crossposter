@@ -5,38 +5,6 @@ import os
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 read_dotenv(dotenv_path)
 
-# // Config File //
-import configparser
-
-
-def create_config():
-    config = configparser.ConfigParser()
-    config["general"] = {
-        "prefix": "!art",
-        "crosspost_message": "{user} posted some art!",
-        "debug": False,
-    }
-    config["discord"] = {
-        "crosspost_channel": "channel_id_here",
-    }
-    with open("config.ini", "w") as config_file:
-        config.write(config_file)
-
-
-def read_config():
-    config = configparser.ConfigParser()
-    config.read("config.ini")
-    # config_values = {"discord_crosspost_channel": (config.get("Discord", "crosspost_channel"))}
-    # return config_values
-    if config["general"]["debug"] is True:
-        main_file_handler.setLevel(logging.DEBUG)
-        main_stream_handler.setLevel(logging.DEBUG)
-    return config
-
-
-# config_values = None
-config = None
-
 # // Files & Paths //
 from thumbnail import generate_thumbnail
 crosspost_path = {
@@ -52,56 +20,76 @@ make_paths += crosspost_paths.values()
 for path in make_paths:
     os.makedirs(path, exist_ok=True)
 
-# // Logging //
-import logging
 
-main_log = logging.getLogger("main")
-main_log.setLevel(logging.DEBUG)
+# // Seperate Modules //
+from config_manager import create_config, read_config
+from logger_setup import MAIN_LOG, DISCORD_LOG_HANDLER
 
-main_file_handler = logging.FileHandler("main.log")
-main_file_handler.setLevel(logging.INFO)
-main_log.addHandler(main_file_handler)
 
-main_stream_handler = logging.StreamHandler()
-main_stream_handler.setLevel(logging.INFO)
-main_log.addHandler(main_stream_handler)
+def setup():
+    if not os.path.exists("config.ini"):
+        create_config()
+        MAIN_LOG.info("Config file created. Please edit it before running bot.py again.")
+        return None, MAIN_LOG
 
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-main_file_handler.setFormatter(formatter)
-main_stream_handler.setFormatter(formatter)
 
-discord_log_handler = logging.FileHandler(
-    filename="discord.log", encoding="utf-8", mode="w"
-)
+    def error(e):
+        _ = "Failed to start bot due to error reading config."
+        if e:
+            _ += f"\nError: {e}"
+        MAIN_LOG.error(_ + "\nExiting.")
+        raise AssertionError()
+    
+    try:
+        config = read_config()
+    except Exception as e:
+        error(e)
+    if config is None:
+        error("config was none after read attempt")
+
+    try:
+        is_debug = config.getboolean('general', 'debug')
+    except (KeyError, ValueError):
+            is_debug = False # just default to false if unable to read
+    
+    if is_debug:
+        MAIN_LOG.setLevel(logging.DEBUG)
+
+    return config, MAIN_LOG
+
+
 
 
 # // Discord //
 import discord
 
-
 class DiscordClient(discord.Client):
+    # Overridden later
     crosspost_prefix = None
+    target_channel = None
 
     async def on_ready(self):
-        main_log.info(
+        self.crosspost_prefix = config['general']['prefix']
+        self.target_channel = await self.fetch_channel(config["discord"]["crosspost_channel"])
+        MAIN_LOG.info(
             f"Discord client ready. Logged in as {self.user.name} - Owned by {self.application.owner}"
         )
-        self.crosspost_prefix = config['general']['prefix']
 
     async def on_message(self, message):
-        main_log.debug(f"Discord message received: {message.content}")
+        MAIN_LOG.debug(f"Discord message received: {message.content}")
         content = message.content
+        prefix = self.crosspost_prefix
+
         if not message.author.id == self.user.id and (
             self.crosspost_prefix + " " in content
             or content.endswith(self.crosspost_prefix)
         ):
-            main_log.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
+            MAIN_LOG.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
 
             # Notes:
-            # I'm considering implementing bot-/server-side AI data poisoning for all art (images and text mainly)
+            # I'm considering implementing bot-/server-side AI training protection and data poisoning for all art (images and text mainly)
             # before reuploading that back to Discord or in crossposts to other platforms.
             # That's why I'm universally downloading images instead of just passing attachment URLs.
-            # For now at least.
 
             # Collect media (might go with a different solution idk)
             # Note: This isn't a temporary cache. I'm intending to create a public viewable gallery on a future dedicated site (protected against scraping and glazed+nightshaded against AI training obviously)
@@ -152,11 +140,11 @@ class DiscordClient(discord.Client):
             if single_image:
                 embed.set_image(url=single_image)
 
-            main_log.debug(
+            MAIN_LOG.debug(
                 f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
             )
-            _ = await self.fetch_channel(config["discord"]["crosspost_channel"])
-            await _.send(msg)
+
+            await self.target_channel.send(msg)
 
     async def welcome_message(self):
         # TODO: implement
@@ -164,19 +152,17 @@ class DiscordClient(discord.Client):
         pass
 
 
-discord_intents = discord.Intents.default()
-discord_intents.message_content = True
-discord_client = DiscordClient(intents=discord_intents)
 
 if __name__ == "__main__":
-    if not os.path.exists("config.ini"):
-        create_config()
-        print("Config file created. Please edit it before running bot.py again.")
-    else:
-        config = read_config()
-        if config is None:
-            raise AssertionError("config was none after reading")
-        main_log.debug(config)
-        discord_client.run(
-            token=os.getenv("DISCORD_TOKEN"), log_handler=discord_log_handler
-        )
+    config, log = setup()
+
+    if config is None:
+        exit(1) # Note to self: setup may use create_config() and return nothing. This is totally valid
+
+    discord_intents = discord.Intents.default()
+    discord_intents.message_content = True
+    discord_client = DiscordClient(intents=discord_intents)
+
+    discord_client.run(
+        token=os.getenv("DISCORD_TOKEN"), log_handler=DISCORD_LOG_HANDLER
+    )
