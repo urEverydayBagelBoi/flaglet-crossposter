@@ -13,9 +13,10 @@ Mostly notes for myself since I'm not really expecting an influx of contribution
 - Keep things platform-agnostic wherever possible.
 - Try to modularize things wherever possible, especially relating to platform support
 - Since I'm a very amateur programmer, suggestions for how things could be entirely different are welcome and appreciated
-- Please don't just sloperate (LLM-generate) half-hallucinated PR's together if you're not testing and inspecting them yourself. I'm trying to learn and experiment here. I could prompt an LLM myself, thanks.
+- Please don't just sloperate (LLM-generate) half-hallucinated PR's if you're not actively testing and inspecting them yourself.
 
 # Road map
+I may not implement these in any particular order
 - [x] Basic functionality
 - [ ] Support for stoat.chat (also other platforms later)
 - [ ] Send crossposts into a moderator channel to be approved, before being posted across all platforms
