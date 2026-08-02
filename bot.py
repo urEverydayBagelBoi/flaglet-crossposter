@@ -5,63 +5,44 @@ import os
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 read_dotenv(dotenv_path)
 
-# // Config File //
-import configparser
+# // Seperate Modules //
+from config_manager import create_config, read_config
+from logger_setup import MAIN_LOG, DISCORD_LOG_HANDLER
 
 
-def create_config():
-    config = configparser.ConfigParser()
-    config["general"] = {
-        "prefix": "!art",
-        "debug": False,
-    }
-    config["discord"] = {
-        "crosspost_channel": "channel_id",
-    }
-    with open("config.ini", "w") as config_file:
-        config.write(config_file)
+def setup():
+    if not os.path.exists("config.ini"):
+        create_config()
+        MAIN_LOG.info("Config file created. Please edit it before running bot.py again.")
+        return None, MAIN_LOG
 
 
-def read_config():
-    config = configparser.ConfigParser()
-    config.read("config.ini")
-    # config_values = {"discord_crosspost_channel": (config.get("Discord", "crosspost_channel"))}
-    # return config_values
-    if config['general']['debug'] is True:
-        main_file_handler.setLevel(logging.DEBUG)
-        main_stream_handler.setLevel(logging.DEBUG)
-    return config
+    def error(e):
+        _ = "Failed to start bot due to error reading config."
+        if e:
+            _ += f"\nError: {e}"
+        MAIN_LOG.error(_ + "\nExiting.")
+        raise AssertionError()
+    
+    try:
+        config = read_config()
+    except Exception as e:
+        error(e)
+    if config is None:
+        error("config was none after read attempt")
 
+    try:
+        is_debug = config.getboolean('general', 'debug')
+    except (KeyError, ValueError):
+            is_debug = False # just default to false if unable to read
+    
+    if is_debug:
+        MAIN_LOG.setLevel(logging.DEBUG)
 
-# config_values = None
-config = None
-
-# // Logging //
-import logging
-
-main_log = logging.getLogger("main")
-main_log.setLevel(logging.DEBUG)
-
-main_file_handler = logging.FileHandler("main.log")
-main_file_handler.setLevel(logging.INFO)
-main_log.addHandler(main_file_handler)
-
-main_stream_handler = logging.StreamHandler()
-main_stream_handler.setLevel(logging.INFO)
-main_log.addHandler(main_stream_handler)
-
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-main_file_handler.setFormatter(formatter)
-main_stream_handler.setFormatter(formatter)
-
-discord_log_handler = logging.FileHandler(
-    filename="discord.log", encoding="utf-8", mode="w"
-)
-
+    return config, MAIN_LOG
 
 # // Discord //
 import discord
-
 
 class DiscordClient(discord.Client):
     crosspost_prefix = None
@@ -72,18 +53,18 @@ class DiscordClient(discord.Client):
     #     self.crosspost_prefix = config['general']['prefix']
 
     async def on_ready(self):
-        main_log.info(
+        MAIN_LOG.info(
             f"Discord client ready. Logged in as {self.user.name} - Owned by {self.application.owner}"
         )
         self.crosspost_prefix = config['general']['prefix']
 
     async def on_message(self, message):
-        main_log.debug(f"Discord message received: {message.content}")
+        MAIN_LOG.debug(f"Discord message received: {message.content}")
         content = message.content
         if not message.author.id == self.user.id and (
             self.crosspost_prefix + " " in content or content.endswith(self.crosspost_prefix)
         ):
-            main_log.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
+            MAIN_LOG.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
             attachment_urls = " ".join(
                 [attachment.url for attachment in message.attachments]
             )
@@ -91,7 +72,7 @@ class DiscordClient(discord.Client):
             if attachment_urls != "":
                 msg += f"-# {attachment_urls}"
 
-            main_log.debug(
+            MAIN_LOG.debug(
                 f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
             )
 
@@ -111,7 +92,7 @@ if __name__ == "__main__":
         config = read_config()
         if config is None:
             raise AssertionError("config was none after reading")
-        main_log.debug(config)
+        MAIN_LOG.debug(config)
         discord_client.run(
-            token=os.getenv("DISCORD_TOKEN"), log_handler=discord_log_handler
+            token=os.getenv("DISCORD_TOKEN"), log_handler=DISCORD_LOG_HANDLER
         )
