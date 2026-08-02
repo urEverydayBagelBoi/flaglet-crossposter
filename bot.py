@@ -70,7 +70,7 @@ class DiscordClient(discord.Client):
             )
             msg = f"Original Message: {message.jump_url}\nAuthor: {message.author.mention}\n\n> {content}"
             if attachment_urls != "":
-                msg += f"-# {attachment_urls}"
+                msg += f"\n-# {attachment_urls}"
 
             MAIN_LOG.debug(
                 f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
