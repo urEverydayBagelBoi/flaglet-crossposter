@@ -95,10 +95,11 @@ class DiscordClient(discord.Client):
             # Note: This isn't a temporary cache. I'm intending to create a public viewable gallery on a future dedicated site (protected against scraping and glazed+nightshaded against AI training obviously)
             image_file_paths = []
             other_file_paths = []
+            attachments = message.attachments
             if attachments.len() == 1 and attachments[0].content_type.startswith("image"):
                 single_image = attachments[0].url
             else:
-                for attachment in message.attachments:
+                for attachment in attachments:
                     if attachment.content_type.startswith("image"):
                         path = crosspost_path["image"] + attachment.filename
                         image = True
