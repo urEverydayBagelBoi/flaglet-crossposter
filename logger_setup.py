@@ -1,5 +1,6 @@
 import logging
 
+
 def setup_logging():
     main_log = logging.getLogger("main")
     main_log.setLevel(logging.INFO)
@@ -17,10 +18,3 @@ def setup_logging():
         return main_log
 
     return main_log
-
-
-# These are imported from bot.py
-MAIN_LOG = setup_logging()
-DISCORD_LOG_HANDLER = logging.FileHandler(
-    filename="discord.log", mode="w"
-)

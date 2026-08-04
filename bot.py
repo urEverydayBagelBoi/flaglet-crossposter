@@ -5,32 +5,28 @@ import os
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 read_dotenv(dotenv_path)
 
-# // Files & Paths //
-from thumbnail import generate_thumbnail
-crosspost_path = {
-    "image": "./media/image/",
-    "video": "./media/video/",
-    "audio": "./media/audio/",
-    "text": "./media/text/",
-    "video": "./media/3d/",
-    "other": "./media/other/",
-}
-make_paths = ['./media/', './media/temp/']
-make_paths += crosspost_paths.values()
-for path in make_paths:
-    os.makedirs(path, exist_ok=True)
 
-
-# // Seperate Modules //
-from config_manager import create_config, read_config
-from logger_setup import MAIN_LOG, DISCORD_LOG_HANDLER
-
-
+# // Setup... //
+# - Logging
+# - Config
 def setup():
+    # Import Config
+    from config_manager import create_config, read_config
+
+    # Logging
+    from logging import FileHandler
+    from logger_setup import setup_logging
+
+    MAIN_LOG = setup_logging()
+    DISCORD_LOG_HANDLER = FileHandler(
+        filename="discord.log", mode="w"
+    )
+
+    # // Config //
     if not os.path.exists("config.ini"):
         create_config()
-        MAIN_LOG.info("Config file created. Please edit it before running bot.py again.")
-        return None, MAIN_LOG
+        print("Config file created. Please edit it before running bot.py again.")
+        return None, MAIN_LOG, 
 
 
     def error(e):
@@ -47,15 +43,8 @@ def setup():
     if config is None:
         error("config was none after read attempt")
 
-    try:
-        is_debug = config.getboolean('general', 'debug')
-    except (KeyError, ValueError):
-            is_debug = False # just default to false if unable to read
     
-    if is_debug:
-        MAIN_LOG.setLevel(logging.DEBUG)
-
-    return config, MAIN_LOG
+    return config, MAIN_LOG, DISCORD_LOG_HANDLER
 
 
 
@@ -85,67 +74,39 @@ class DiscordClient(discord.Client):
             or content.endswith(self.crosspost_prefix)
         ):
             MAIN_LOG.debug(f"{DiscordClient.crosspost_prefix} messsage detected")
-
-            # Notes:
-            # I'm considering implementing bot-/server-side AI training protection and data poisoning for all art (images and text mainly)
-            # before reuploading that back to Discord or in crossposts to other platforms.
-            # That's why I'm universally downloading images instead of just passing attachment URLs.
-
-            # Collect media (might go with a different solution idk)
-            # Note: This isn't a temporary cache. I'm intending to create a public viewable gallery on a future dedicated site (protected against scraping and glazed+nightshaded against AI training obviously)
-            image_file_paths = []
-            other_file_paths = []
-            attachments = message.attachments
-            if attachments.len() == 1 and attachments[0].content_type.startswith("image"):
-                single_image = attachments[0].url
-            else:
-                for attachment in attachments:
-                    if attachment.content_type.startswith("image"):
-                        path = crosspost_path["image"] + attachment.filename
-                        image = True
-                    elif attachment.content_type.startswith("video"):
-                        path = crosspost_path["video"] + attachment.filename
-                    elif attachment.content_type.startswith("audio"):
-                        path = crosspost_path["audio"] + attachment.filename
-                    elif attachment.content_type.startswith("text"):
-                        path = crosspost_path["text"] + attachment.filename
-                    elif attachment.content_type.startswith("model"):
-                        path = crosspost_path["3d"] + attachment.filename
-                    else:
-                        path = crosspost_path["other"] + attachment.filename
-
-                    if image:
-                        image_file_paths += path
-                    else:
-                        other_file_paths += path
-
-                    data = await attachment.read()
-                    if data is not None:
-                        with open(path, "wb") as file:
-                            file.write(data)
-                    else:
-                        other_file_paths += './media/file-question-mark.png' # display this placeholder, icon from lucide.dev
-            
-            # TODO:
-            # - Create a temporary directory in ./media/temp named after message.id for thumbnails
-            # - Supported images just have to be downscaled first if they're too large, then copy to temp dir
-            # - All other filetypes have to be turned into thumbnails with the thumbnail module, then copied to temp dir
-
-            embed = discord.Embed(
-                title=config["general"]["crosspost_message"],
-                url=message.jump_url,
-                timestamp=message.timestamp,
-                color=discord.Color.blurple,
-            )
-            embed.add_field(value=content) # text
-            if single_image:
-                embed.set_image(url=single_image)
-
             MAIN_LOG.debug(
                 f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
             )
 
-            await self.target_channel.send(msg)
+            title = config["general"]["crosspost_message"].format(user=message.author.name)
+            main_embed = discord.Embed(
+                title=title,
+                description=content,
+                url=message.jump_url,
+                timestamp=message.created_at,
+            )
+            user_url = f"https://discord.com/users/{message.author.id}"
+            main_embed.set_author(name=message.author.name, icon_url=message.author.avatar.url, url=user_url)
+
+            filtered_attachments = filter(lambda attachment: attachment.content_type.startswith("image"), message.attachments)
+            filtered_attachments = list(filtered_attachments)
+            MAIN_LOG.debug(f"main_embed: {main_embed}")
+            MAIN_LOG.debug(f"user_url: {user_url}")
+            MAIN_LOG.debug(f"filtered_attachments: {filtered_attachments}")
+
+            # just use cdn media links instead of downloading and reuploading
+            if filtered_attachments == []:
+                MAIN_LOG.debug(f"No valid attachments in message.")
+                await self.target_channel.send(embed=main_embed)
+            elif len(filtered_attachments) > 1:
+                MAIN_LOG.debug(f"Multiple valid attachments in message.")
+                embeds = [main_embed,] + [discord.Embed(url=message.jump_url).set_image(url=attachment.url) for attachment in filtered_attachments[0:]]
+                await self.target_channel.send(embeds=embeds)
+            else:
+                MAIN_LOG.debug(f"One valid attachment in message.")
+                main_embed.set_image(url=filtered_attachments[0].url)
+                await self.target_channel.send(embed=main_embed)
+            
 
     async def welcome_message(self):
         # TODO: implement
@@ -155,10 +116,10 @@ class DiscordClient(discord.Client):
 
 
 if __name__ == "__main__":
-    config, log = setup()
-
+    config, MAIN_LOG, DISCORD_LOG_HANDLER = setup()
     if config is None:
-        exit(1) # Note to self: setup may use create_config() and return nothing. This is totally valid
+        exit() # Note to self: setup() may use create_config() and return nothing for config. This is totally valid
+
 
     discord_intents = discord.Intents.default()
     discord_intents.message_content = True

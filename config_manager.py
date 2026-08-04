@@ -7,6 +7,7 @@ def create_config():
     config = configparser.ConfigParser()
     config["general"] = {
         "prefix": "!art",
+        "crosspost_message": "{user} posted some art!",
         "debug": False,
     }
     config["discord"] = {
