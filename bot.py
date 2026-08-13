@@ -78,6 +78,7 @@ class DiscordClient(discord.Client):
                 f"Discord crosspost channel from config: {config['discord']['crosspost_channel']}"
             )
 
+            # // Embed //
             title = config["general"]["crosspost_message"].format(user=message.author.name)
             main_embed = discord.Embed(
                 title=title,
@@ -87,26 +88,39 @@ class DiscordClient(discord.Client):
             )
             user_url = f"https://discord.com/users/{message.author.id}"
             main_embed.set_author(name=message.author.name, icon_url=message.author.avatar.url, url=user_url)
-
-            filtered_attachments = filter(lambda attachment: attachment.content_type.startswith("image"), message.attachments)
-            filtered_attachments = list(filtered_attachments)
-            MAIN_LOG.debug(f"main_embed: {main_embed}")
             MAIN_LOG.debug(f"user_url: {user_url}")
-            MAIN_LOG.debug(f"filtered_attachments: {filtered_attachments}")
+            MAIN_LOG.debug(f"main_embed: {main_embed}")
 
-            # just use cdn media links instead of downloading and reuploading
-            if filtered_attachments == []:
+            # // Attachments //
+            image_attachments = []
+            # non_image_attachments = []
+            for attachment in message.attachments:
+                if attachment.content_type.startswith("image"):
+                    # image_attachments += attachment
+                    image_attachments.append(attachment)
+                # else:
+                #     non_image_attachments.append(attachment)
+            urls = [attachment.url for attachment in image_attachments]
+            # Note: image_attachments and non_image_attachments will be used later
+
+
+            # // Send //
+            if urls == []:
                 MAIN_LOG.debug(f"No valid attachments in message.")
                 await self.target_channel.send(embed=main_embed)
-            elif len(filtered_attachments) > 1:
+            elif len(urls) > 1:
                 MAIN_LOG.debug(f"Multiple valid attachments in message.")
-                embeds = [main_embed,] + [discord.Embed(url=message.jump_url).set_image(url=attachment.url) for attachment in filtered_attachments[0:]]
+                if len(message.attachments) > 4:
+                    extra = str(len(message.attachments) - 4)
+                    footer = (f"+{extra} other attachments")
+                    main_embed.set_footer(text=footer)
+                embeds = [main_embed,] + [discord.Embed(url=message.jump_url).set_image(url=url) for url in urls[0:]]
                 await self.target_channel.send(embeds=embeds)
             else:
                 MAIN_LOG.debug(f"One valid attachment in message.")
-                main_embed.set_image(url=filtered_attachments[0].url)
+                main_embed.set_image(url=urls[0])
                 await self.target_channel.send(embed=main_embed)
-            
+
 
     async def welcome_message(self):
         # TODO: implement
