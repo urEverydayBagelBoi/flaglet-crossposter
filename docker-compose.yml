@@ -1,5 +1,6 @@
 services:
   flaglet:
+    container_name: flaglet
     build: .
     environment:
       - PYTHONUNBUFFERED=1
