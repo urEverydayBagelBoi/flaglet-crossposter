@@ -4,7 +4,9 @@ aiosignal==1.4.0
 attrs==25.4.0
 audioop-lts==0.2.2
 croniter==6.0.0
+discord==2.3.2
 discord-typings==0.9.0
+discord.py==2.7.1
 emoji==2.15.0
 frozenlist==1.8.0
 idna==3.11
