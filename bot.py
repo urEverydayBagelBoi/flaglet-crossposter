@@ -26,7 +26,7 @@ def setup():
     if not os.path.exists("config.ini"):
         create_config()
         print("Config file created. Please edit it before running bot.py again.")
-        return None, MAIN_LOG, 
+        return None, MAIN_LOG, DISCORD_LOG_HANDLER
 
 
     def error(e):
