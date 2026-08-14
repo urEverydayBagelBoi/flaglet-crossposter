@@ -1,0 +1,6 @@
+services:
+  flaglet:
+    build: .
+    environment:
+      - PYTHONUNBUFFERED=1
+
