@@ -10,7 +10,6 @@ discord.py==2.7.1
 emoji==2.15.0
 frozenlist==1.8.0
 idna==3.11
-interactions.py==5.15.0
 multidict==6.7.0
 propcache==0.4.1
 py-dotenv==0.1
