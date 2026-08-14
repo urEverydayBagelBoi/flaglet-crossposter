@@ -5,9 +5,10 @@ Messages containing a configured tag (`!art` by default) will be crossposted by 
 ## Details
 - Assumes being run and configured for a **single server**. Not as an app.
 - Narrow-scoped
+- Supports Discord only, for now. I intend to add more platforms later.
 
 # Contributing and Dev Guidelines
-Mostly notes for myself since I'm not really expecting an influx of contributions xP
+Mostly notes for myself since I'm not really expecting contributions from anyone else xP
 
 - Keep functionality narrowed to crossposting messages and connecting various platforms
 - Keep things platform-agnostic wherever possible.
@@ -17,7 +18,7 @@ Mostly notes for myself since I'm not really expecting an influx of contribution
 
 # Road map
 I may not implement these in any particular order
-- [x] Basic functionality
+- [x] Basic functionality with Discord
 - [ ] Support for stoat.chat (also other platforms later)
 - [ ] Send crossposts into a moderator channel to be approved, before being posted across all platforms
 - [ ] Send crossposts as a fancy embed, consistent across all platforms
