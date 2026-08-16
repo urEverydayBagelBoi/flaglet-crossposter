@@ -1,6 +1,5 @@
-# // Config File //
+from __future__ import annotations
 import configparser
-import os
 
 
 def create_config():
@@ -17,12 +16,12 @@ def create_config():
         config.write(config_file)
 
 
-def read_config():
+def read_config() -> configparser.ConfigParser:
     """Read config.ini, returns ConfigParser object."""
     config = configparser.ConfigParser()
     try:
         config.read("config.ini")
     except Exception as e:
         raise AssertionError(f"Error reading config file: {e}")
-    
+
     return config
