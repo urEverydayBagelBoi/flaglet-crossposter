@@ -4,7 +4,7 @@
 ``CrosspostRecord`` to the live platform layer, so you can do
 ``await crosspost.get_source()`` and get a real ``discord.Message``.
 
-``Hub`` owns the config, persistence and the per-platform send/edit/delete
+``Hub`` owns persistence and the per-platform send/edit/delete
 logic behind the approve / deny / purge transitions.
 """
 
@@ -63,7 +63,7 @@ class Crosspost:
             return None
         return await self.core.fetch_message(self.record.queue_message)
 
-    async def get_crossposts(self) -> -> list[Any]:
+    async def get_crossposts(self) -> list[Any]:
         """Posted crossposts as native objects, per platform, per respective feed channel."""
         return [await self.core.fetch_message(ref) for ref in self.record.crossposts]
 
