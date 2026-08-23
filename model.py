@@ -38,6 +38,10 @@ class MessageRef:
     message_id: int
     guild_id: int
     author_id: int
+    id: str = field(
+        default_factory=lambda: uuid.uuid4().hex
+    )  # used only for db at the moment
+    # NOTE: I might change this later idk if this is a good way of doing this
 
     def to_dict(self) -> dict:
         return {
