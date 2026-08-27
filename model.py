@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 from enum import Enum
 from dataclasses import dataclass, field
@@ -32,12 +33,12 @@ class MessageRef:
     Discord: ``(guild_id, channel_id, message.id)``.
     """
 
+    message_id: int
+    author_id: int
+    channel_id: int
+    guild_id: int
     platform: Platform
     # Note to self; may want to make these `int | str` if platforms get added with hex IDs
-    channel_id: int
-    message_id: int
-    guild_id: int
-    author_id: int
     id: str = field(
         default_factory=lambda: uuid.uuid4().hex
     )  # used only for db at the moment
@@ -45,19 +46,21 @@ class MessageRef:
 
     def to_dict(self) -> dict:
         return {
-            "platform": self.platform.value,
-            "channel_id": self.channel_id,
+            "id": self.id,
             "message_id": self.message_id,
-            "guild_id": self.guild_id,
             "author_id": self.author_id,
+            "channel_id": self.channel_id,
+            "guild_id": self.guild_id,
+            "platform": self.platform.value,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> MessageRef:
+    def from_dict(cls, data: dict[str, Any]) -> MessageRef:
         return cls(
+            id=data["id"],
+            message_id=data["message_id"],
             platform=Platform(data["platform"]),
             channel_id=data["channel_id"],
-            message_id=data["message_id"],
             guild_id=data.get("guild_id"),
             author_id=data.get("author_id"),
         )
@@ -86,7 +89,7 @@ class CrosspostRecord:
     created_at: datetime.datetime = field(default_factory=_now)
     decided_at: datetime.datetime | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "status": self.status.value,
