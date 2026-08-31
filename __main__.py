@@ -1,9 +1,33 @@
 from __future__ import annotations
 from configparser import ConfigParser
-from logging import Handler, Logger
+
+# from logging import Handler, Logger
+import logging
 import discord
 from py_dotenv import read_dotenv
 import os
+
+
+# // Logging //
+def setup_logging() -> logging.Logger:
+    main_log = logging.getLogger("main")
+    main_log.setLevel(logging.INFO)
+
+    # File Handler
+    file_handler = logging.FileHandler("main.log")
+    file_handler.setLevel(logging.INFO)
+    main_log.addHandler(file_handler)
+
+    # Stream Handler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    main_log.addHandler(stream_handler)
+
+    if main_log.hasHandlers():
+        return main_log
+
+    return main_log
+
 
 # // Environment Variables //
 dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -149,6 +173,7 @@ class DiscordClient(discord.Client):
         pass
 
 
+# NOTE: Is this necessary now? (since I renamed the main file from bot.py to __main__.py
 if __name__ == "__main__":
     config, MAIN_LOG, DISCORD_LOG_HANDLER = setup()
     if config is None:
