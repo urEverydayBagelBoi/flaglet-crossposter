@@ -5,7 +5,9 @@ This keeps db ops atomic and allows for sharing of a connection across multiple 
 
 from __future__ import annotations
 
-from aiosqlite import connect, Connection
+# from aiosqlite import connect, Connection
+import aiosqlite
+import sqlite3
 from .model import CrosspostRecord, Status
 from dataclasses import dataclass
 
@@ -32,45 +34,56 @@ class CrosspostRepository:
         "guild_id",
         "platform",
         "crossposted_from",
+        "added_as",
     ]
 
-    def __init__(self, path: str, conn: Connection | None = None):
+    def __init__(self, path: str):
         self.path = path
-        if conn is None:
-            conn = connect(self.path)
+        conn = sqlite3.connect(self.path)
+        cursor = conn.cursor()
 
         # NOTE: Structure in the SQL database is NOT equal to whats described in model.py
         # Mainly that Crossposts cannot contain an instance of MessageRefs, so instead rows in MessageRefs refer to *Crossposts* from which they originate.
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS MessageRefs (
-                id                  TEXT PRIMARY KEY,
-                message_id          INTEGER,
-                author_id           INTEGER,
-                channel_id          INTEGER,
-                guild_id            INTEGER,
-                platform            TEXT,
-                crossposted_from    TEXT FOREIGN KEY REFERENCES Crossposts(id),
-            """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS Crossposts (
-                id              TEXT PRIMARY KEY,
-                status          TEXT NOT NULL,
-                source          TEXT FOREIGN KEY REFERENCES MessageRefs(id),
-                queue_message   TEXT FOREIGN KEY REFERENCES MessageRefs(id),
-                reason          TEXT,
-                created_at      INTEGER NOT NULL,
-                decided_at      INTEGER,
-            """)
+        # MessageRefs also get added_as for debugging purposes
 
-    def save(self, record: CrosspostRecord, conn: Connection | None = None) -> None:
+        # conn.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS MessageRefs (
+            id                  TEXT PRIMARY KEY,
+            message_id          INTEGER,
+            author_id           INTEGER,
+            channel_id          INTEGER,
+            guild_id            INTEGER,
+            platform            TEXT,
+            crossposted_from    TEXT,
+            added_as            TEXT,
+            FOREIGN KEY(crossposted_from) REFERENCES Crossposts(id)
+        )
+        """)
+        # FOREIGN KEY(crossposted_from) REFERENCES Crossposts(id),
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Crossposts (
+            id              TEXT PRIMARY KEY,
+            status          TEXT NOT NULL,
+            source          TEXT,
+            queue_message   TEXT,
+            reason          TEXT,
+            created_at      INTEGER NOT NULL,
+            decided_at      INTEGER,
+            FOREIGN KEY(queue_message) REFERENCES MessageRefs(id),
+            FOREIGN KEY(source) REFERENCES MessageRefs(id)
+        )
+        """)
+        conn.commit()
+        conn.close()
+
+    async def save(
+        self, record: CrosspostRecord, conn: Connection | None = None
+    ) -> None:
         """Save a crosspost record in its entirety to the db, new or existing."""
-        # TODO: Implement
-        # Issue: Here I would need to do either of...
-        # 1. Overwrite all columns for whatever row is getting updated, even if its just one or a few.
-        # 2. Read *all* values for the given row and then overwrite the ones that get changed.
-        # 3. Make a seperate `update` function that optionally patches a row instead of overwriting it entirely
         if conn is None:
-            conn = connect(self.path)
+            conn = aiosqlite.connect(self.path)
 
         # // Insert into Crossposts //
         _ = ", ".join(["?" for _ in range(1, len(self.crossposts_columns))])
@@ -116,9 +129,9 @@ class CrosspostRepository:
 
         value_sets = []
         for message in record.crossposts:
-            values = list(message.to_dict().values()).append(
-                record.id
-            )  # appends value for crossposted_from   ^^^^^^ here!
+            values = list(message.to_dict().values()).extend(
+                [record.id, "crosspost"]  # crossposted_from  # added_as
+            )
             value_sets.append(values)
 
         # If a given message already exists, just skip it with no update.
