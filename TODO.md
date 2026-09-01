@@ -1,0 +1,1 @@
+- [ ] Make adjustments for crossposting through a slash command or similar instead of exclusively text tags in messages
