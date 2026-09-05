@@ -1,3 +1,9 @@
+> [!WARNING]
+> **!!IMPORTANT NOTE!!**
+> 
+> This repo has been moved to: https://forgejo.minibase.social/urEverydayBagelBoi/flaglet-crossposter. So under the group for which it is being built.
+
+
 # What is this?
 This is a crossposting social bot, written in Python. I develop it primarily for a social, online art collective/group I'm working on.
 Messages containing a configured tag (`!art` by default) will be crossposted by the bot to a feed channel. That's it.
